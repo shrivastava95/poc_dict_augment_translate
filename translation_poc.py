@@ -87,6 +87,8 @@ def save_all(parent_folder):
     save_translations(parent_folder, translations)
     save_is_used(parent_folder, is_used)
     save_test_sentences(parent_folder, test_sentences)
+    if parent_folder == data_path:
+        messagebox.showinfo("SUCCESS", f"Successfully saved to original source folder.")
 
 def add_translation(SOURCE_ID, source, translation, checkbox, parent_folder):
     # assign to dicts
@@ -110,7 +112,10 @@ def add_translation(SOURCE_ID, source, translation, checkbox, parent_folder):
     save_all(parent_folder)
 
     # update the view inside the GUI
-    my_game.insert(parent='', index='end', iid=0, text='', values=(SOURCE_ID, source, translation, checkbox))
+    #DEBUGGING
+    entries = my_game.get_children()
+    entry_count = len(entries)
+    my_game.insert(parent='', index='end', iid=entry_count, text='', values=(SOURCE_ID, source, translation, checkbox))
 
 def clear_entry():
     # clear entry boxes
@@ -132,8 +137,11 @@ def update_entry(event):
 def _debug_entry():
     print([entry0.get(), entry1.get(), entry2.get(), entry3.get()])
 
+def generate_new_source_id():
+    return (0 if not len(sources) else max(sources.keys())) + 1
+
 def new_entry():
-    SOURCE_ID = max(sources.keys()) + 1
+    SOURCE_ID = generate_new_source_id()
     entry0.delete(0, tk.END)
     entry0.insert(tk.END, SOURCE_ID)
 
@@ -142,7 +150,7 @@ def add_update_record():
     try:
         SOURCE_ID = int(entry0.get())
     except: # if SOURCE_ID == ''
-        SOURCE_ID = max(sources.keys()) + 1
+        SOURCE_ID = generate_new_source_id()
     if entry1 == '' or entry2 == '' or entry3 == '': # no insertion of empty values
         messagebox.showinfo("Error", "ERROR: you tried inserting empty values.")
         return
@@ -162,12 +170,14 @@ def remove_translation():
         return
     for item in my_game.get_children():
         values = my_game.item(item, 'values')
-        if values[0] == SOURCE_ID:
+        print(values)
+        if int(values[0]) == SOURCE_ID:
             my_game.delete(item)
+            del sources[SOURCE_ID], translations[SOURCE_ID], is_used[SOURCE_ID], test_sentences[SOURCE_ID]
             messagebox.showinfo("SUCCESS", f"Successfully deleted record with Source_Id: {entry0.get()}")
     
 def score_translations():
-    data_dict = {sources[SOURCE_ID]: translations[SOURCE_ID] for SOURCE_ID in sources.keys()}
+    data_dict = {sources[SOURCE_ID]: translations[SOURCE_ID] for SOURCE_ID in sources.keys() if is_used[SOURCE_ID]}
     bleu_scores = []
     for SOURCE_ID in sources.keys():
         for SENTENCE_ID in test_sentences[SOURCE_ID].keys():
@@ -180,7 +190,7 @@ def score_translations():
             candidate_tokens = translated_sent.split()
 
             # Calculate the BLEU score
-            bleu_score = sentence_bleu([reference_tokens], candidate_tokens, weights=(0.5, 0.5, 0, 0))
+            bleu_score = sentence_bleu([reference_tokens], candidate_tokens, weights=(0.25, 0.25, 0.25, 0.25))
             bleu_scores.append(bleu_score)
     score = np.mean(bleu_scores)
     evaluate_entry.delete(0, tk.END)
@@ -234,7 +244,7 @@ my_game.heading(my_game['columns'][3], text="Used in Augmentation", anchor=tk.CE
 
 # add data from the dicts
 for source_id in sources.keys():
-    print(type(is_used[source_id]))
+    # print(type(is_used[source_id]))
     my_game.insert('', 'end', text="", values=(source_id, 
                                                sources[source_id], 
                                                translations[source_id],
@@ -282,7 +292,7 @@ edit_button.pack(pady = 10)
 clear_button = tk.Button(root, text="Clear Entry Box", command=clear_entry)
 clear_button.pack(pady = 10)
 
-new_button = tk.Button(root, text="New Translation ", command=new_entry)
+new_button = tk.Button(root, text="Generate new Id", command=new_entry)
 new_button.pack(pady = 10)
 
 remove_button = tk.Button(root, text="Remove Translation", command=remove_translation)
